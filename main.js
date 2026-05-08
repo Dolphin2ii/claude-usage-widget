@@ -496,15 +496,8 @@ function generateRedXIcon() {
 function showMainWindowClean() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
-  if (process.platform === 'win32') {
-    mainWindow.setOpacity(0);
-    mainWindow.show();
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setOpacity(1);
-    }, 50);
-  } else {
-    mainWindow.show();
-  }
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function createTray() {
@@ -646,7 +639,19 @@ function updateTrayIcon(usageData) {
   const showTrayStats = store.get('settings.showTrayStats', false);
   
   if (!showTrayStats) {
-    destroyTrayIcons();
+    // Destroy only weeklyTray, keeping sessionTray alive as a persistent restore
+    // icon. Without it, hide() on Windows leaves no way to restore the window.
+    // Apply the same Linux appindicator cleanup that destroyTrayIcons() uses.
+    if (weeklyTray && !weeklyTray.isDestroyed()) {
+      try {
+        weeklyTray.removeAllListeners();
+        weeklyTray.setContextMenu(null);
+        weeklyTray.setToolTip('');
+        if (process.platform === 'linux') weeklyTray.setImage(nativeImage.createEmpty());
+        weeklyTray.destroy();
+      } catch (_) {}
+      weeklyTray = null;
+    }
     return;
   }
 
@@ -809,12 +814,15 @@ ipcMain.handle('validate-session-key', async (event, sessionKey) => {
 
 ipcMain.on('minimize-window', () => {
   if (mainWindow) {
-    // macOS: minimize to Dock so the user can restore via Dock click
-    // Windows/Linux: hide to tray (taskbar may be hidden, tray is the restore path)
     if (process.platform === 'darwin') {
       mainWindow.minimize();
     } else {
-      mainWindow.hide();
+      const minimizeToTray = store.get('settings.minimizeToTray', false);
+      if (minimizeToTray) {
+        mainWindow.hide();
+      } else {
+        mainWindow.minimize();
+      }
     }
   }
 });
