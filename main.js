@@ -496,15 +496,8 @@ function generateRedXIcon() {
 function showMainWindowClean() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
-  if (process.platform === 'win32') {
-    mainWindow.setOpacity(0);
-    mainWindow.show();
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setOpacity(1);
-    }, 50);
-  } else {
-    mainWindow.show();
-  }
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function createTray() {
@@ -603,11 +596,8 @@ function updateTrayIcon(usageData) {
   const showTrayStats = store.get('settings.showTrayStats', false);
   
   if (!showTrayStats) {
-    // Destroy both tray icons when feature is disabled
-    if (sessionTray && !sessionTray.isDestroyed()) {
-      sessionTray.destroy();
-      sessionTray = null;
-    }
+    // Only destroy the extra weekly icon. Keep sessionTray alive as a static
+    // icon so the tray always has a restore path when the window is hidden.
     if (weeklyTray && !weeklyTray.isDestroyed()) {
       weeklyTray.destroy();
       weeklyTray = null;
@@ -774,12 +764,15 @@ ipcMain.handle('validate-session-key', async (event, sessionKey) => {
 
 ipcMain.on('minimize-window', () => {
   if (mainWindow) {
-    // macOS: minimize to Dock so the user can restore via Dock click
-    // Windows/Linux: hide to tray (taskbar may be hidden, tray is the restore path)
     if (process.platform === 'darwin') {
       mainWindow.minimize();
     } else {
-      mainWindow.hide();
+      const minimizeToTray = store.get('settings.minimizeToTray', false);
+      if (minimizeToTray) {
+        mainWindow.hide();
+      } else {
+        mainWindow.minimize();
+      }
     }
   }
 });
