@@ -3,14 +3,14 @@
     font-family: 'Libre Baskerville';
     font-style: normal;
     font-weight: 400;
-    src: url('../../../assets/fonts/LibreBaskerville-Regular.ttf') format('truetype');
+    src: url('../../assets/fonts/LibreBaskerville-Regular.ttf') format('truetype');
 }
 
 @font-face {
     font-family: 'Libre Baskerville';
     font-style: normal;
     font-weight: 700;
-    src: url('../../../assets/fonts/LibreBaskerville-Bold.ttf') format('truetype');
+    src: url('../../assets/fonts/LibreBaskerville-Bold.ttf') format('truetype');
 }
 
 * {
