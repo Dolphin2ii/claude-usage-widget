@@ -185,7 +185,7 @@ npm start
 - **Refresh** — Click the refresh icon to update data immediately
 - **Graph** — Click the graph icon to toggle usage history
 - **Minimize** — Click the minus icon to hide to system tray / dock
-- **Close** — Click the X to minimize to tray (doesn't exit)
+- **Close** — Click the X to Close the app
 
 ### System Tray
 
