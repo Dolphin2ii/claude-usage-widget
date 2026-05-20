@@ -58,7 +58,7 @@ let weeklyTray = null;   // Tray icon for Weekly usage
 
 const WIDGET_WIDTH = process.platform === 'darwin' ? 590 : 560;
 const WIDGET_HEIGHT = 155;
-const HISTORY_RETENTION_DAYS = 30;
+const HISTORY_RETENTION_DAYS = 8;
 const CHART_DAYS = 7;
 const MAX_HISTORY_SAMPLES = 10000; // Cap total samples to prevent unbounded growth
 
@@ -103,6 +103,25 @@ function storeUsageHistory(data) {
   }
 
   store.set(historyKey, history);
+}
+
+// Prune all per-org history keys at startup. Trims entries older than the retention
+// window and deletes the key entirely if nothing remains — cleans up abandoned accounts.
+function pruneStaleHistoryKeys() {
+  const cutoff = Date.now() - (HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const allKeys = Object.keys(store.store);
+  for (const key of allKeys) {
+    if (!key.startsWith('usageHistory_') && key !== 'usageHistory') continue;
+    const history = store.get(key, []);
+    const fresh = history.filter((entry) => entry.timestamp > cutoff);
+    if (fresh.length === 0) {
+      store.delete(key);
+      debugLog('[History] Deleted stale key:', key);
+    } else if (fresh.length < history.length) {
+      store.set(key, fresh);
+      debugLog('[History] Pruned', history.length - fresh.length, 'old entries from', key);
+    }
+  }
 }
 
 // Set session-level User-Agent to avoid Electron detection
@@ -1392,6 +1411,8 @@ app.whenReady().then(async () => {
   if (sessionKey) {
     await setSessionCookie(sessionKey);
   }
+
+  pruneStaleHistoryKeys();
 
   createMainWindow();
   // Avoid creating temporary tray icons during startup when tray stats are disabled.
