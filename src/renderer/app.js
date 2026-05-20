@@ -1322,6 +1322,9 @@ function renderChart(history) {
         }
     }
 
+    const firstDayMidnight = new Date(history[0].timestamp);
+    firstDayMidnight.setHours(0, 0, 0, 0);
+
     usageChart = new Chart(elements.usageChart.getContext('2d'), {
         type: 'line',
         data: { datasets },
@@ -1336,7 +1339,7 @@ function renderChart(history) {
             scales: {
                 x: {
                     type: 'linear',
-                    min: history[0].timestamp,
+                    min: firstDayMidnight.getTime(),
                     max: history[history.length - 1].timestamp,
                     ticks: {
                         stepSize: 86400000,
