@@ -259,15 +259,15 @@
                                 </label>
                             </div>
                             <div class="settings-col">
-                                <span class="settings-row-label">Usage Alerts</span>
+                                <span class="settings-row-label">Show tray stats</span>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="usageAlertsToggle">
+                                    <input type="checkbox" id="showTrayStatsToggle">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
                         </div>
 
-                        <!-- Row 3: compact mode -->
+                        <!-- Row 3: compact mode + usage alerts -->
                         <div class="settings-row-2col">
                             <div class="settings-col">
                                 <span class="settings-row-label">Compact mode</span>
@@ -277,11 +277,15 @@
                                 </label>
                             </div>
                             <div class="settings-col">
-                                <!-- Organization selector placeholder -->
+                                <span class="settings-row-label">Usage Alerts</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="usageAlertsToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
                         </div>
 
-                        <!-- Row 3: theme + show tray stats -->
+                        <!-- Row 4: theme + organization selector -->
                         <div class="settings-row-2col">
                             <div class="settings-col">
                                 <span class="settings-row-label">Theme</span>
@@ -291,12 +295,12 @@
                                     <button class="theme-btn" data-theme="system">System</button>
                                 </div>
                             </div>
-                            <div class="settings-col">
-                                <span class="settings-row-label">Show tray stats</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="showTrayStatsToggle">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                            <div class="settings-col" id="orgSelectorCol" style="display: none;">
+                                <span class="settings-row-label">Organization</span>
+                                <select id="orgSelector" class="settings-select">
+                                    <option value="org1">My Org (Personal)</option>
+                                    <option value="org2">Acme Corp (Team)</option>
+                                </select>
                             </div>
                         </div>
 
@@ -348,19 +352,6 @@
                             </div>
                         </div>
 
-                        <!-- Row 7: organization selector (when available) -->
-                        <div class="settings-row-2col">
-                            <div class="settings-col" id="orgSelectorCol" style="display: none;">
-                                <span class="settings-row-label">Organization</span>
-                                <select id="orgSelector" class="settings-select">
-                                    <option value="org1">My Org (Personal)</option>
-                                    <option value="org2">Acme Corp (Team)</option>
-                                </select>
-                            </div>
-                            <div class="settings-col">
-                                <!-- placeholder -->
-                            </div>
-                        </div>
                     </div>
 
                     <div class="settings-footer">
