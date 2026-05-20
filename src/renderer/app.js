@@ -1341,8 +1341,17 @@ function renderChart(history) {
                     type: 'linear',
                     min: firstDayMidnight.getTime(),
                     max: history[history.length - 1].timestamp,
+                    afterBuildTicks(axis) {
+                        const end = history[history.length - 1].timestamp;
+                        const d = new Date(firstDayMidnight.getTime());
+                        const ticks = [];
+                        while (d.getTime() <= end) {
+                            ticks.push({ value: d.getTime() });
+                            d.setDate(d.getDate() + 1);
+                        }
+                        axis.ticks = ticks;
+                    },
                     ticks: {
-                        stepSize: 86400000,
                         maxRotation: 0,
                         minRotation: 0,
                         font: {
