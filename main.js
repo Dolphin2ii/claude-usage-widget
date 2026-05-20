@@ -58,13 +58,23 @@ let weeklyTray = null;   // Tray icon for Weekly usage
 
 const WIDGET_WIDTH = process.platform === 'darwin' ? 590 : 560;
 const WIDGET_HEIGHT = 155;
-const HISTORY_RETENTION_DAYS = 30;
+const HISTORY_RETENTION_DAYS = 8;
 const CHART_DAYS = 7;
 const MAX_HISTORY_SAMPLES = 10000; // Cap total samples to prevent unbounded growth
 
 function storeUsageHistory(data) {
+  // Skip write if the session is invalid — a live session always has resets_at timestamps.
+  // Absent timestamps mean the API returned empty/zeroed data (dead session, removed device, etc.)
+  if (!data.five_hour?.resets_at && !data.seven_day?.resets_at) {
+    debugLog('[History] Skipping write — no reset timestamps, likely invalid session data');
+    return;
+  }
+
+  const organizationId = store.get('organizationId');
+  const historyKey = organizationId ? `usageHistory_${organizationId}` : 'usageHistory';
+
   const timestamp = Date.now();
-  let history = store.get('usageHistory', []);
+  let history = store.get(historyKey, []);
 
   history.push({
     timestamp,
@@ -78,12 +88,45 @@ function storeUsageHistory(data) {
   const cutoff = timestamp - (HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   history = history.filter((entry) => entry.timestamp > cutoff);
 
-  // If still over limit, drop oldest samples
   if (history.length > MAX_HISTORY_SAMPLES) {
     history = history.slice(history.length - MAX_HISTORY_SAMPLES);
   }
 
-  store.set('usageHistory', history);
+  store.set(historyKey, history);
+}
+
+// Migrate legacy single-key history to the per-org namespaced key at startup,
+// so get-usage-history reads from the right place before any fetch has run.
+function migrateUsageHistoryKey() {
+  const organizationId = store.get('organizationId');
+  if (!organizationId) return;
+  const historyKey = `usageHistory_${organizationId}`;
+  if (store.has(historyKey)) return;
+  const legacy = store.get('usageHistory', []);
+  if (legacy.length > 0) {
+    store.set(historyKey, legacy);
+    store.delete('usageHistory');
+    debugLog('[History] Migrated legacy usageHistory →', historyKey);
+  }
+}
+
+// Prune all per-org history keys at startup. Trims entries older than the retention
+// window and deletes the key entirely if nothing remains — cleans up abandoned accounts.
+function pruneStaleHistoryKeys() {
+  const cutoff = Date.now() - (HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const allKeys = Object.keys(store.store);
+  for (const key of allKeys) {
+    if (!key.startsWith('usageHistory_') && key !== 'usageHistory') continue;
+    const history = store.get(key, []);
+    const fresh = history.filter((entry) => entry.timestamp > cutoff);
+    if (fresh.length === 0) {
+      store.delete(key);
+      debugLog('[History] Deleted stale key:', key);
+    } else if (fresh.length < history.length) {
+      store.set(key, fresh);
+      debugLog('[History] Pruned', history.length - fresh.length, 'old entries from', key);
+    }
+  }
 }
 
 // Set session-level User-Agent to avoid Electron detection
@@ -921,7 +964,9 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('get-usage-history', () => {
-  const history = store.get('usageHistory', []);
+  const organizationId = store.get('organizationId');
+  const historyKey = organizationId ? `usageHistory_${organizationId}` : 'usageHistory';
+  const history = store.get(historyKey, []);
   const cutoff = Date.now() - (CHART_DAYS * 24 * 60 * 60 * 1000);
   return history
     .filter((entry) => entry.timestamp > cutoff)
@@ -1371,6 +1416,9 @@ app.whenReady().then(async () => {
   if (sessionKey) {
     await setSessionCookie(sessionKey);
   }
+
+  migrateUsageHistoryKey();
+  pruneStaleHistoryKeys();
 
   createMainWindow();
   // Avoid creating temporary tray icons during startup when tray stats are disabled.
