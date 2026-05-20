@@ -1336,6 +1336,8 @@ function renderChart(history) {
             scales: {
                 x: {
                     type: 'linear',
+                    min: history[0].timestamp,
+                    max: history[history.length - 1].timestamp,
                     ticks: {
                         maxTicksLimit: 5,
                         maxRotation: 0,
