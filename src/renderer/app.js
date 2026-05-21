@@ -1051,7 +1051,7 @@ function startCountdown() {
     countdownInterval = setInterval(() => {
         refreshTimers();
         if (isExpanded) refreshExtraTimers();
-    }, 1000);
+    }, 30000);
 }
 
 // Update progress bar
