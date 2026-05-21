@@ -17,6 +17,7 @@ This file is tracked in the repo and visible to everyone.
 | `design/settings-column-reorder` | Settings panel right-column reorder |
 | `fix/chart-axis-bounds` | Clamp chart X-axis to actual data range; stable daily tick labels |
 | `feature/extended-usage-fields` | Display Cowork, OAuth Apps, Sonnet, Opus rows and chart lines; fix resets_at blank |
+| `fix/rc-version-update-alert` | Pre-release tags never trigger update alert regardless of version number |
 
 ---
 
@@ -82,6 +83,13 @@ All four rows and chart lines only appear when the API returns non-null data for
 
 **Fix: Resets At blank for all extra rows**
 The reset date text (e.g. "Resets May 27") was never being populated for any extra row — the span was created but left empty. All extra rows now correctly display their reset date using the same `formatResetsAt` logic as the main session and weekly rows.
+
+---
+
+### fix/rc-version-update-alert
+
+**Pre-release versions never trigger update notifications**
+The update check now immediately returns false if the remote version has any pre-release suffix (rc, beta, alpha, etc.), regardless of whether the version number is higher than the installed version. Previously the pre-release check was only applied when version numbers were equal — so a tag like `v1.7.5-rc.1` compared against an installed `1.7.4` would incorrectly trigger the update alert.
 
 ---
 
