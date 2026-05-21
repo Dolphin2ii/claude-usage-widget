@@ -1322,6 +1322,9 @@ function renderChart(history) {
         }
     }
 
+    const firstDayMidnight = new Date(history[0].timestamp);
+    firstDayMidnight.setHours(0, 0, 0, 0);
+
     usageChart = new Chart(elements.usageChart.getContext('2d'), {
         type: 'line',
         data: { datasets },
@@ -1336,8 +1339,19 @@ function renderChart(history) {
             scales: {
                 x: {
                     type: 'linear',
+                    min: firstDayMidnight.getTime(),
+                    max: history[history.length - 1].timestamp,
+                    afterBuildTicks(axis) {
+                        const end = history[history.length - 1].timestamp;
+                        const d = new Date(firstDayMidnight.getTime());
+                        const ticks = [];
+                        while (d.getTime() <= end) {
+                            ticks.push({ value: d.getTime() });
+                            d.setDate(d.getDate() + 1);
+                        }
+                        axis.ticks = ticks;
+                    },
                     ticks: {
-                        maxTicksLimit: 5,
                         maxRotation: 0,
                         minRotation: 0,
                         font: {
