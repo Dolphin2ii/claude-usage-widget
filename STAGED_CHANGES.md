@@ -18,6 +18,7 @@ This file is tracked in the repo and visible to everyone.
 | `fix/chart-axis-bounds` | Clamp chart X-axis to actual data range; stable daily tick labels |
 | `feature/extended-usage-fields` | Display Cowork, OAuth Apps, Sonnet, Opus rows and chart lines; fix resets_at blank |
 | `fix/rc-version-update-alert` | Pre-release tags never trigger update alert regardless of version number |
+| `fix/claude-design-field` | Add Design (7d) row and chart line for seven_day_omelette field (brown) |
 
 ---
 
@@ -90,6 +91,13 @@ The reset date text (e.g. "Resets May 27") was never being populated for any ext
 
 **Pre-release versions never trigger update notifications**
 The update check now immediately returns false if the remote version has any pre-release suffix (rc, beta, alpha, etc.), regardless of whether the version number is higher than the installed version. Previously the pre-release check was only applied when version numbers were equal — so a tag like `v1.7.5-rc.1` compared against an installed `1.7.4` would incorrectly trigger the update alert.
+
+---
+
+### fix/claude-design-field
+
+**Add Design (7d) row and chart line**
+The `seven_day_omelette` API field was previously (incorrectly) aliased to Cowork. It is now correctly mapped as its own "Design (7d)" row in brown, with history tracking and a chart line. The erroneous normalization has been removed so Cowork and Design are fully independent.
 
 ---
 
