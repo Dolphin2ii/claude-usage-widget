@@ -145,6 +145,8 @@ Reported and root-caused by Geozstevenzz with full reproduction steps, environme
 
 Co-authored-by: Geozstevenzz <21692161+Geozstevenzz@users.noreply.github.com>
 
+**README:** Add @Geozstevenzz to the Contributors section before cutting 1.7.5 release.
+
 ---
 
 *Add new entries above this line as additional branches are staged.*
