@@ -58,19 +58,33 @@ let weeklyTray = null;   // Tray icon for Weekly usage
 
 const WIDGET_WIDTH = process.platform === 'darwin' ? 590 : 560;
 const WIDGET_HEIGHT = 155;
-const HISTORY_RETENTION_DAYS = 30;
+const HISTORY_RETENTION_DAYS = 8;
 const CHART_DAYS = 7;
 const MAX_HISTORY_SAMPLES = 10000; // Cap total samples to prevent unbounded growth
 
 function storeUsageHistory(data) {
+  // Skip write if the session is invalid — a live session always has resets_at timestamps.
+  // Absent timestamps mean the API returned empty/zeroed data (dead session, removed device, etc.)
+  if (!data.five_hour?.resets_at && !data.seven_day?.resets_at) {
+    debugLog('[History] Skipping write — no reset timestamps, likely invalid session data');
+    return;
+  }
+
+  const organizationId = store.get('organizationId');
+  const historyKey = organizationId ? `usageHistory_${organizationId}` : 'usageHistory';
+
   const timestamp = Date.now();
-  let history = store.get('usageHistory', []);
+  let history = store.get(historyKey, []);
 
   history.push({
     timestamp,
     session: data.five_hour?.utilization || 0,
     weekly: data.seven_day?.utilization || 0,
     sonnet: data.seven_day_sonnet?.utilization || 0,
+    opus: data.seven_day_opus?.utilization || 0,
+    cowork: data.seven_day_cowork?.utilization || 0,
+    design: data.seven_day_omelette?.utilization || 0,
+    oauthApps: data.seven_day_oauth_apps?.utilization || 0,
     extraUsage: data.extra_usage?.utilization || 0
   });
 
@@ -78,12 +92,45 @@ function storeUsageHistory(data) {
   const cutoff = timestamp - (HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   history = history.filter((entry) => entry.timestamp > cutoff);
 
-  // If still over limit, drop oldest samples
   if (history.length > MAX_HISTORY_SAMPLES) {
     history = history.slice(history.length - MAX_HISTORY_SAMPLES);
   }
 
-  store.set('usageHistory', history);
+  store.set(historyKey, history);
+}
+
+// Migrate legacy single-key history to the per-org namespaced key at startup,
+// so get-usage-history reads from the right place before any fetch has run.
+function migrateUsageHistoryKey() {
+  const organizationId = store.get('organizationId');
+  if (!organizationId) return;
+  const historyKey = `usageHistory_${organizationId}`;
+  if (store.has(historyKey)) return;
+  const legacy = store.get('usageHistory', []);
+  if (legacy.length > 0) {
+    store.set(historyKey, legacy);
+    store.delete('usageHistory');
+    debugLog('[History] Migrated legacy usageHistory →', historyKey);
+  }
+}
+
+// Prune all per-org history keys at startup. Trims entries older than the retention
+// window and deletes the key entirely if nothing remains — cleans up abandoned accounts.
+function pruneStaleHistoryKeys() {
+  const cutoff = Date.now() - (HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const allKeys = Object.keys(store.store);
+  for (const key of allKeys) {
+    if (!key.startsWith('usageHistory_') && key !== 'usageHistory') continue;
+    const history = store.get(key, []);
+    const fresh = history.filter((entry) => entry.timestamp > cutoff);
+    if (fresh.length === 0) {
+      store.delete(key);
+      debugLog('[History] Deleted stale key:', key);
+    } else if (fresh.length < history.length) {
+      store.set(key, fresh);
+      debugLog('[History] Pruned', history.length - fresh.length, 'old entries from', key);
+    }
+  }
 }
 
 // Set session-level User-Agent to avoid Electron detection
@@ -874,7 +921,12 @@ ipcMain.on('minimize-window', () => {
 });
 
 ipcMain.on('close-window', () => {
-  app.quit();
+  const showTrayStats = store.get('settings.showTrayStats', false);
+  if (showTrayStats && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  } else {
+    app.quit();
+  }
 });
 
 ipcMain.on('resize-window', (event, height) => {
@@ -921,7 +973,9 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('get-usage-history', () => {
-  const history = store.get('usageHistory', []);
+  const organizationId = store.get('organizationId');
+  const historyKey = organizationId ? `usageHistory_${organizationId}` : 'usageHistory';
+  const history = store.get(historyKey, []);
   const cutoff = Date.now() - (CHART_DAYS * 24 * 60 * 60 * 1000);
   return history
     .filter((entry) => entry.timestamp > cutoff)
@@ -986,9 +1040,13 @@ ipcMain.handle('save-settings', (event, settings) => {
   store.set('settings.expandedOpen', settings.expandedOpen);
   store.set('settings.showTrayStats', settings.showTrayStats);
 
+  const isPortable = process.platform === 'win32' && !!process.env.PORTABLE_EXECUTABLE_FILE;
+
   // openAtLogin is not supported on Linux — Electron silently ignores it.
   // Skip the call entirely to avoid misleading behaviour.
-  if (supportsLoginItems) {
+  // Also skip for portable builds — autorun via registry is unreliable when the
+  // exe path changes with each version. Users should use shell:startup instead.
+  if (supportsLoginItems && !isPortable) {
     app.setLoginItemSettings({
       openAtLogin: autoStart,
       ...(process.platform !== 'darwin' && { path: app.getPath('exe') })
@@ -1163,8 +1221,6 @@ ipcMain.handle('check-for-update', () => {
 
 function isNewerVersion(remote, local) {
   try {
-    // Parse version strings with optional pre-release tags
-    // Examples: "1.7.1", "1.7.2-rc.1", "2.0.0-beta.3"
     const parseVersion = (ver) => {
       const [mainVer, preRelease] = ver.split('-');
       const parts = mainVer.split('.').map(Number);
@@ -1179,19 +1235,17 @@ function isNewerVersion(remote, local) {
     const r = parseVersion(remote);
     const l = parseVersion(local);
 
+    // Never notify about pre-release versions (rc, beta, alpha, etc.)
+    if (r.preRelease !== null) return false;
+
     // Compare major.minor.patch
     if (r.major !== l.major) return r.major > l.major;
     if (r.minor !== l.minor) return r.minor > l.minor;
     if (r.patch !== l.patch) return r.patch > l.patch;
 
-    // If versions are equal, check pre-release tags
-    // A version WITHOUT pre-release is NEWER than one WITH pre-release
-    // Examples: 1.7.2 > 1.7.2-rc.1, 1.7.2 > 1.7.2-beta.1
-    if (r.preRelease === null && l.preRelease !== null) return true;   // remote is stable, local is pre-release
-    if (r.preRelease !== null && l.preRelease === null) return false;  // remote is pre-release, local is stable
-
-    // Both have same version and both stable (or both pre-release) - not newer
-    return false;
+    // Same version numbers — notify if local is a pre-release and remote is stable
+    // e.g. local=1.7.5-rc.1, remote=1.7.5 → user should be told stable is out
+    return l.preRelease !== null;
   } catch { return false; }
 }
 
@@ -1371,6 +1425,9 @@ app.whenReady().then(async () => {
   if (sessionKey) {
     await setSessionCookie(sessionKey);
   }
+
+  migrateUsageHistoryKey();
+  pruneStaleHistoryKeys();
 
   createMainWindow();
   // Avoid creating temporary tray icons during startup when tray stats are disabled.
