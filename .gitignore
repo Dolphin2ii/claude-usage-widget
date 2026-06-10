@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 package-lock.json
 
@@ -49,3 +49,6 @@ developer_id.key
 developer_id.csr
 developer_id.p12
 developerID_application.cer
+
+# Temp commit message files
+commit_msg.txt
